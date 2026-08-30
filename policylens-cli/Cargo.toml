@@ -1,0 +1,16 @@
+[package]
+name = "policylens-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "policylens"
+path = "src/main.rs"
+
+[dependencies]
+policylens-graph = { path = "../policylens-graph" }
+policylens-rules = { path = "../policylens-rules" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+petgraph.workspace = true

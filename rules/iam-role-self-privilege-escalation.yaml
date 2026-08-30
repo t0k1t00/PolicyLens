@@ -1,0 +1,42 @@
+# Rule 5 of 5 built-ins: privilege escalation within IAM (a role that can
+# grant itself more permissions).
+#
+# This is the DSL's best stress test: the pattern's start and end node
+# matchers describe the *same physical resource* (a role reachable from
+# itself via an IamGrants edge whose actions include IAM-modifying calls
+# like iam:PutRolePolicy / iam:AttachRolePolicy / iam:CreatePolicyVersion).
+# It shows the path pattern doesn't need a distinct "sink" node type --
+# `to` just has to satisfy the same node matcher as `from`. No branching or
+# special-casing needed in the engine for a path that loops back.
+#
+# A role having *some* IAM permissions is unremarkable (it's how
+# infrastructure automation roles work). What makes this a genuine chain is
+# that those permissions target IAM itself and the role's own trust policy
+# already allows something other than a tightly-scoped service principal to
+# assume it -- i.e. whoever/whatever can assume this role can bootstrap
+# their way to unbounded permissions.
+id: iam-role-self-privilege-escalation
+title: "IAM role can grant itself additional permissions (privilege escalation path)"
+description: >
+  A role has an IAM grant (via an attached/inline policy) whose actions
+  include permissions that modify IAM policy attachments or versions,
+  targeting itself or a policy it controls. Combined with a trust policy
+  that isn't scoped to a single, specific, trusted principal, this means
+  anything able to assume the role can escalate its own permissions after
+  the fact -- a chain that is invisible to a scanner checking "does this
+  role have admin access" in isolation, since the role's *declared*
+  permissions may look modest.
+severity_base: critical
+max_total_hops: 2
+path:
+  - node:
+      kind: IamRole
+      where: "_derived.wildcard_trust == true"
+      bind: escalatable_role
+  - edge:
+      kind: IamGrants
+      where: "_derived.grants_iam_escalation == true"
+  - node:
+      kind: IamRole
+      where: "_derived.wildcard_trust == true"
+      bind: escalatable_role

@@ -1,0 +1,58 @@
+name: CI
+
+# Runs on every push and PR: format check, clippy lint, build, and the full
+# test suite (unit + integration, including the full 8-module test corpus
+# and rule-coverage/evidence-accuracy tests). Any failure here blocks merge.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: fmt + clippy + build + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --workspace --all-targets
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Smoke-test the CLI against the vulnerable corpus (must find something)
+        run: |
+          cargo run -p policylens-cli -- scan test-corpus/vuln-01-public-bucket-untrusted-role \
+            | tee /tmp/vuln-scan.txt
+          grep -q "finding(s)" /tmp/vuln-scan.txt
+
+      - name: Smoke-test the CLI against a zero-issue module (must find nothing)
+        run: |
+          cargo run -p policylens-cli -- scan test-corpus/zero-01-single-private-bucket \
+            | tee /tmp/zero-scan.txt
+          grep -q "No cross-resource attack chains found" /tmp/zero-scan.txt

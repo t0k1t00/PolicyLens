@@ -1,0 +1,34 @@
+# Rule 2 of 5: overly permissive IAM role + sensitive resource access.
+#
+# Deliberately simpler than rule 1 (no public-bucket or trust-policy
+# condition) to show the DSL doesn't force every rule into the same shape.
+# This one flags a role/policy granting wildcard-scoped IAM actions
+# (`s3:*`, or a bare `*`) against a resource tagged `sensitive = true`,
+# regardless of who can assume the role -- the point is that "wildcard
+# access to something sensitive" is worth surfacing on its own, since a
+# single-resource scanner checking only "does this bucket policy allow
+# public access" would miss a same-account role with unnecessarily broad
+# grants to sensitive data it has no legitimate reason to fully control.
+id: overly-permissive-role-sensitive-access
+title: "IAM role has wildcard-scoped access to a sensitive resource"
+description: >
+  A role (via an inline or attached policy) is granted wildcard-scoped
+  actions (e.g. `s3:*`, or `*`) against a resource tagged as sensitive.
+  Even without a public-facing entry point, this is excess blast radius:
+  anything that can assume the role -- a compromised credential, a
+  misconfigured trust relationship discovered later, an insider mistake --
+  inherits full control over sensitive data rather than the minimum access
+  its actual job requires.
+severity_base: medium
+max_total_hops: 1
+path:
+  - node:
+      kind: IamRole
+      bind: role
+  - edge:
+      kind: IamGrants
+      where: "_derived.grants_wildcard == true"
+  - node:
+      kind: S3Bucket
+      where: "_derived.sensitive == true"
+      bind: sensitive_bucket

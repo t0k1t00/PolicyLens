@@ -1,0 +1,45 @@
+# Rule 4 of 5: open security group + direct path to a data store.
+#
+# Within PolicyLens's narrow AWS scope (S3, IAM, Lambda, EC2 security
+# groups -- no RDS/managed database resources), "data store" is modeled as
+# an S3 bucket tagged sensitive, and "direct path" is modeled as: an EC2
+# instance sits behind a security group with an open (0.0.0.0/0) ingress
+# rule, and that instance's IAM role (via its instance profile -- see
+# classify.rs's `Attached` edge, which collapses the profile indirection)
+# has a grant reaching the sensitive bucket. A network scanner alone would
+# flag "SG open to the world" without knowing what's behind it; an IAM
+# scanner alone would flag "role has bucket access" without knowing it's
+# reachable from the open internet. Neither sees the combination.
+id: open-security-group-to-data-store
+title: "Internet-facing security group protects compute with a path to a sensitive data store"
+description: >
+  A security group allows unrestricted inbound access (0.0.0.0/0) to an EC2
+  instance, and that instance's IAM role has a grant reaching a sensitive
+  S3 bucket. An open security group is not automatically a finding (many
+  legitimate public-facing services exist), and neither is an instance role
+  with bucket access -- but together, anyone who can reach the instance
+  over the open port has a path (via whatever runs on that instance) to the
+  sensitive data the role can access.
+severity_base: high
+max_total_hops: 3
+path:
+  - node:
+      kind: SecurityGroup
+      where: "_derived.open_ingress == true"
+      bind: open_sg
+  - edge:
+      kind: NetworkReachable
+  - node:
+      kind: Instance
+      bind: exposed_instance
+  - edge:
+      kind: Attached
+  - node:
+      kind: IamRole
+      bind: instance_role
+  - edge:
+      kind: IamGrants
+  - node:
+      kind: S3Bucket
+      where: "_derived.sensitive == true"
+      bind: sensitive_bucket

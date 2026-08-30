@@ -1,0 +1,43 @@
+# Rule 1 of 5 built-ins: public storage + writable-by-untrusted-role.
+#
+# Catches the canonical cross-resource miss: an S3 bucket that is publicly
+# accessible AND reachable (via an IamGrants edge -- computed by the Stage 3
+# classification pass from parsed IAM policy JSON) from a role whose trust
+# policy (assume_role_policy) accepts a wildcard/untrusted principal. Each
+# resource alone can look fine to a single-resource scanner: the bucket's
+# public flag might be an intentional (if risky) product requirement, and
+# a role with wildcard trust might be dismissed as "just a demo/test role."
+# Together, they mean literally anyone can write into a bucket the org
+# considers public-safe-to-read only -- or worse, poison what gets read
+# from it downstream.
+id: public-storage-writable-by-untrusted-role
+title: "Publicly accessible storage is writable by a role with untrusted trust policy"
+description: >
+  An S3 bucket with public access enabled has a write-capable IAM grant
+  reachable from a role that trusts a wildcard or otherwise untrusted
+  principal to assume it. This chain means an unauthenticated or
+  unauthorized actor can both read and overwrite objects in the bucket,
+  even though the individual resources might each pass a single-resource
+  check (a "public" flag is not inherently a finding; wildcard trust is
+  sometimes intentional for federated setups) -- it's the combination that
+  is dangerous.
+# Note on edge direction: `IamGrants` edges are actor -> target (the role
+# that HAS the grant, pointing at the resource it can act on) -- that's the
+# natural direction for "who can do what," and it's the direction
+# classify.rs actually builds. So this path reads "untrusted role -[grants
+# write]-> public bucket," not the reverse; the *finding* is still about
+# the bucket being reachable, the path direction is just actor-first.
+severity_base: high
+max_total_hops: 2
+path:
+  - node:
+      kind: IamRole
+      where: "_derived.wildcard_trust == true"
+      bind: untrusted_role
+  - edge:
+      kind: IamGrants
+      where: '_derived.grants_write == true'
+  - node:
+      kind: S3Bucket
+      where: "_derived.public == true"
+      bind: public_bucket
