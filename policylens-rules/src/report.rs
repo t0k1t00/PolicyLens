@@ -78,7 +78,7 @@ pub fn build_report(
     // Highest severity first, so the report reads worst-first -- the
     // whole point of scoring is to triage attention, so the report itself
     // should reflect that ordering rather than making the reader re-sort.
-    reports.sort_by(|a, b| b.severity.score.cmp(&a.severity.score));
+    reports.sort_by_key(|r| std::cmp::Reverse(r.severity.score));
 
     let mut by_severity: std::collections::BTreeMap<String, usize> = Default::default();
     for r in &reports {
