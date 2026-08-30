@@ -14,11 +14,11 @@
 use crate::classify::edge_derived_facts;
 use crate::predicate::{self, Predicate};
 use crate::rule::{EdgeMatcher, NodeMatcher, PathStep, Rule};
-use policylens_graph::graph::IacGraph;
-use policylens_graph::types::{Edge, EdgeKind, ResourceKind};
 use petgraph::graph::{EdgeIndex, NodeIndex};
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
+use policylens_graph::graph::IacGraph;
+use policylens_graph::types::{Edge, EdgeKind, ResourceKind};
 use serde_json::{json, Value};
 
 /// One completed match of a rule's path against the graph: the sequence of
@@ -56,10 +56,9 @@ fn run_rule(graph: &IacGraph, rule: &Rule) -> Vec<Finding> {
         .collect();
 
     // Walk (edge_step, node_step) pairs in order.
-    let mut steps = rule.path[1..].chunks(2);
-    while let Some(pair) = steps.next() {
-        let (PathStep::Edge(edge_step), Some(PathStep::Node(node_step))) =
-            (&pair[0], pair.get(1))
+    let steps = rule.path[1..].chunks(2);
+    for pair in steps {
+        let (PathStep::Edge(edge_step), Some(PathStep::Node(node_step))) = (&pair[0], pair.get(1))
         else {
             unreachable!("validated at load time: strictly alternating, ends on a node");
         };
@@ -95,10 +94,33 @@ fn run_rule(graph: &IacGraph, rule: &Rule) -> Vec<Finding> {
         .into_iter()
         .map(|(_, node_ixs, edges, _)| Finding {
             rule_id: rule.id.clone(),
-            node_ids: node_ixs.iter().map(|&ix| graph.graph[ix].id.clone()).collect(),
+            node_ids: node_ixs
+                .iter()
+                .map(|&ix| graph.graph[ix].id.clone())
+                .collect(),
             edges,
         })
         .collect()
+}
+
+/// Bundles the two hop-count bounds `walk_bounded_hops`'s inner DFS needs,
+/// purely to keep that function's argument count reasonable (clippy's
+/// `too_many_arguments` lint) -- `min_hops` is the rule-declared minimum
+/// chain length, `effective_max` is `edge_step.max_hops` already clamped
+/// against the rule's remaining `max_total_hops` budget.
+#[derive(Clone, Copy)]
+struct HopBounds {
+    min_hops: usize,
+    effective_max: usize,
+}
+
+/// Bundles the edge matcher and its compiled predicate together, again
+/// purely to keep `walk_bounded_hops`'s inner DFS argument count
+/// reasonable -- these two always travel together (a matcher and its own
+/// predicate), so grouping them is also just a more honest signature.
+struct EdgeMatchCtx<'a> {
+    edge_step: &'a EdgeMatcher,
+    edge_pred: Option<&'a Predicate>,
 }
 
 /// From `from_ix`, find every node reachable by 1..=`edge_step.max_hops`
@@ -126,52 +148,38 @@ fn walk_bounded_hops(
     fn dfs(
         graph: &IacGraph,
         cur: NodeIndex,
-        edge_step: &EdgeMatcher,
-        edge_pred: Option<&Predicate>,
+        ctx: &EdgeMatchCtx,
+        bounds: HopBounds,
         depth: usize,
-        effective_max: usize,
-        min_hops: usize,
         trail: &mut Vec<EdgeIndex>,
         out: &mut Vec<(NodeIndex, Vec<EdgeIndex>)>,
     ) {
-        if depth >= min_hops {
+        if depth >= bounds.min_hops {
             out.push((cur, trail.clone()));
         }
-        if depth >= effective_max {
+        if depth >= bounds.effective_max {
             return;
         }
         for edge_ref in graph.graph.edges_directed(cur, Direction::Outgoing) {
-            if !edge_matches(edge_ref.weight(), edge_step, edge_pred) {
+            if !edge_matches(edge_ref.weight(), ctx.edge_step, ctx.edge_pred) {
                 continue;
             }
             trail.push(edge_ref.id());
-            dfs(
-                graph,
-                edge_ref.target(),
-                edge_step,
-                edge_pred,
-                depth + 1,
-                effective_max,
-                min_hops,
-                trail,
-                out,
-            );
+            dfs(graph, edge_ref.target(), ctx, bounds, depth + 1, trail, out);
             trail.pop();
         }
     }
 
     let mut trail = Vec::new();
-    dfs(
-        graph,
-        from_ix,
+    let bounds = HopBounds {
+        min_hops: edge_step.min_hops,
+        effective_max,
+    };
+    let ctx = EdgeMatchCtx {
         edge_step,
         edge_pred,
-        0,
-        effective_max,
-        edge_step.min_hops,
-        &mut trail,
-        &mut results,
-    );
+    };
+    dfs(graph, from_ix, &ctx, bounds, 0, &mut trail, &mut results);
     // depth==0 (the "reached == from_ix, zero hops taken" case) only
     // happens if min_hops == 0, which the DSL doesn't currently allow
     // (min_hops defaults to 1); filtering here keeps the function correct

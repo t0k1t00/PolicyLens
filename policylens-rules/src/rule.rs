@@ -255,7 +255,10 @@ path:
   - node: { kind: S3Bucket }
 "#;
         let err = RuleSet::parse_one(yaml).unwrap_err();
-        assert!(matches!(err, RuleLoadError::PathMustStartAndEndWithNode { .. }));
+        assert!(matches!(
+            err,
+            RuleLoadError::PathMustStartAndEndWithNode { .. }
+        ));
     }
 
     #[test]

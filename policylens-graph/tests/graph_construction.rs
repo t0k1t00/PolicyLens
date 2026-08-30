@@ -9,15 +9,23 @@ use policylens_graph::types::ResourceKind;
 use std::path::Path;
 
 fn fixture(name: &str) -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name)
 }
 
 #[test]
 fn parses_all_resources_with_correct_kinds() {
     let g = build_graph_from_dir(&fixture("basic")).expect("should build");
-    assert_eq!(g.node_count(), 4, "expected exactly the 4 resources in the fixture");
+    assert_eq!(
+        g.node_count(),
+        4,
+        "expected exactly the 4 resources in the fixture"
+    );
 
-    let bucket = g.node("aws_s3_bucket.data").expect("bucket node should exist");
+    let bucket = g
+        .node("aws_s3_bucket.data")
+        .expect("bucket node should exist");
     assert_eq!(bucket.kind, ResourceKind::S3Bucket);
     assert_eq!(bucket.tf_type, "aws_s3_bucket");
     assert_eq!(bucket.tf_name, "data");
@@ -27,7 +35,9 @@ fn parses_all_resources_with_correct_kinds() {
         .expect("public access block node should exist");
     assert_eq!(pab.kind, ResourceKind::S3BucketPublicAccessBlock);
 
-    let role = g.node("aws_iam_role.reader").expect("role node should exist");
+    let role = g
+        .node("aws_iam_role.reader")
+        .expect("role node should exist");
     assert_eq!(role.kind, ResourceKind::IamRole);
 
     let lambda = g
@@ -41,7 +51,10 @@ fn discovers_expected_reference_edges() {
     let g = build_graph_from_dir(&fixture("basic")).expect("should build");
 
     // aws_s3_bucket_public_access_block.data.bucket -> aws_s3_bucket.data
-    let pab_ix = *g.index_of.get("aws_s3_bucket_public_access_block.data").unwrap();
+    let pab_ix = *g
+        .index_of
+        .get("aws_s3_bucket_public_access_block.data")
+        .unwrap();
     let bucket_ix = *g.index_of.get("aws_s3_bucket.data").unwrap();
     assert!(
         g.graph.find_edge(pab_ix, bucket_ix).is_some(),
@@ -79,13 +92,25 @@ fn tags_and_public_access_block_settings_are_preserved_in_attrs() {
     let g = build_graph_from_dir(&fixture("basic")).expect("should build");
     let bucket = g.node("aws_s3_bucket.data").unwrap();
     assert_eq!(
-        bucket.attrs.get("tags").and_then(|t| t.get("sensitive")).and_then(|v| v.as_str()),
+        bucket
+            .attrs
+            .get("tags")
+            .and_then(|t| t.get("sensitive"))
+            .and_then(|v| v.as_str()),
         Some("true")
     );
 
     let pab = g.node("aws_s3_bucket_public_access_block.data").unwrap();
-    assert_eq!(pab.attrs.get("block_public_acls").and_then(|v| v.as_bool()), Some(false));
-    assert_eq!(pab.attrs.get("restrict_public_buckets").and_then(|v| v.as_bool()), Some(true));
+    assert_eq!(
+        pab.attrs.get("block_public_acls").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert_eq!(
+        pab.attrs
+            .get("restrict_public_buckets")
+            .and_then(|v| v.as_bool()),
+        Some(true)
+    );
 }
 
 #[test]
@@ -104,7 +129,18 @@ fn duplicate_resource_address_is_a_hard_error() {
 fn deterministic_node_and_edge_ordering_across_runs() {
     let g1 = build_graph_from_dir(&fixture("basic")).expect("should build");
     let g2 = build_graph_from_dir(&fixture("basic")).expect("should build");
-    let ids1: Vec<_> = g1.graph.node_indices().map(|ix| g1.graph[ix].id.clone()).collect();
-    let ids2: Vec<_> = g2.graph.node_indices().map(|ix| g2.graph[ix].id.clone()).collect();
-    assert_eq!(ids1, ids2, "node ordering should be deterministic across repeated builds");
+    let ids1: Vec<_> = g1
+        .graph
+        .node_indices()
+        .map(|ix| g1.graph[ix].id.clone())
+        .collect();
+    let ids2: Vec<_> = g2
+        .graph
+        .node_indices()
+        .map(|ix| g2.graph[ix].id.clone())
+        .collect();
+    assert_eq!(
+        ids1, ids2,
+        "node ordering should be deterministic across repeated builds"
+    );
 }

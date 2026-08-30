@@ -21,7 +21,15 @@ use serde_json::{Map, Value};
 /// traversals that don't resolve to a real node are simply dropped (with a
 /// debug-log style note) rather than fabricating a dangling edge.
 pub const RESERVED_ROOTS: &[&str] = &[
-    "var", "local", "data", "each", "count", "self", "path", "terraform", "module",
+    "var",
+    "local",
+    "data",
+    "each",
+    "count",
+    "self",
+    "path",
+    "terraform",
+    "module",
 ];
 
 /// One discovered "attribute at `attr_path` traverses into `target_id`"
@@ -231,9 +239,14 @@ pub fn expr_to_json(expr: &Expression) -> (Value, bool) {
             // embedded reference (e.g. a heredoc bucket policy that embeds
             // `${aws_s3_bucket.data.arn}`).
             let unresolved = rendered.contains("${");
-            (Value::String(maybe_parse_embedded_json(&rendered)), unresolved)
+            (
+                Value::String(maybe_parse_embedded_json(&rendered)),
+                unresolved,
+            )
         }
-        Expression::FuncCall(call) if call.name.as_str() == "jsonencode" && call.args.len() == 1 => {
+        Expression::FuncCall(call)
+            if call.name.as_str() == "jsonencode" && call.args.len() == 1 =>
+        {
             // Unwrap jsonencode(...) to its structured argument directly.
             expr_to_json(&call.args[0])
         }
@@ -241,11 +254,11 @@ pub fn expr_to_json(expr: &Expression) -> (Value, bool) {
             Value::String(format!("unresolved:call:{}", call.to_string_lossy_stub())),
             true,
         ),
-        Expression::Variable(v) => (Value::String(format!("unresolved:var:{}", v.as_str())), true),
-        Expression::Traversal(_) => (
-            Value::String(format!("unresolved:ref:{expr}")),
+        Expression::Variable(v) => (
+            Value::String(format!("unresolved:var:{}", v.as_str())),
             true,
         ),
+        Expression::Traversal(_) => (Value::String(format!("unresolved:ref:{expr}")), true),
         Expression::Parenthesis(inner) => expr_to_json(inner),
         Expression::Conditional(_)
         | Expression::Operation(_)

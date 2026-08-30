@@ -64,7 +64,12 @@ pub struct Report {
     pub findings: Vec<FindingReport>,
 }
 
-pub fn build_report(directory: &str, graph: &IacGraph, rules: &[Rule], findings: &[Finding]) -> Report {
+pub fn build_report(
+    directory: &str,
+    graph: &IacGraph,
+    rules: &[Rule],
+    findings: &[Finding],
+) -> Report {
     let mut reports: Vec<FindingReport> = findings
         .iter()
         .map(|f| build_finding_report(graph, rules, f))
@@ -102,10 +107,16 @@ fn build_finding_report(graph: &IacGraph, rules: &[Rule], finding: &Finding) -> 
     let node_ixs: Vec<_> = finding
         .node_ids
         .iter()
-        .map(|id| *graph.index_of.get(id).expect("finding node id exists in graph"))
+        .map(|id| {
+            *graph
+                .index_of
+                .get(id)
+                .expect("finding node id exists in graph")
+        })
         .collect();
 
-    let breakdown: ScoreBreakdown = score_finding(graph, rule.severity_base, &node_ixs, finding.edges.len());
+    let breakdown: ScoreBreakdown =
+        score_finding(graph, rule.severity_base, &node_ixs, finding.edges.len());
 
     let nodes = node_ixs
         .iter()
@@ -173,13 +184,17 @@ fn edge_kind_details(kind: &policylens_graph::types::EdgeKind) -> serde_json::Va
             actions,
             effect,
             resource_match,
-        } => serde_json::json!({ "actions": actions, "effect": effect, "resource_match": resource_match }),
+        } => {
+            serde_json::json!({ "actions": actions, "effect": effect, "resource_match": resource_match })
+        }
         EdgeKind::NetworkReachable {
             protocol,
             from_port,
             to_port,
             cidr,
-        } => serde_json::json!({ "protocol": protocol, "from_port": from_port, "to_port": to_port, "cidr": cidr }),
+        } => {
+            serde_json::json!({ "protocol": protocol, "from_port": from_port, "to_port": to_port, "cidr": cidr })
+        }
         EdgeKind::IamTrust { principal } => serde_json::json!({ "principal": principal }),
         EdgeKind::References | EdgeKind::Attached => serde_json::json!({}),
     }
@@ -199,7 +214,10 @@ pub fn render_human(report: &Report) -> String {
         return out;
     }
 
-    out.push_str(&format!("\n{} finding(s):\n", report.summary.total_findings));
+    out.push_str(&format!(
+        "\n{} finding(s):\n",
+        report.summary.total_findings
+    ));
     for (label, count) in &report.summary.by_severity {
         out.push_str(&format!("  {label}: {count}\n"));
     }
@@ -213,7 +231,10 @@ pub fn render_human(report: &Report) -> String {
             f.severity.score
         ));
         out.push_str(&format!("  rule: {}\n", f.rule_id));
-        out.push_str(&format!("  why this severity: {}\n", f.severity.explanation));
+        out.push_str(&format!(
+            "  why this severity: {}\n",
+            f.severity.explanation
+        ));
         out.push_str(&format!("  chain ({} hop(s)):\n", f.chain_length_hops));
         out.push_str(&format!("    {}", f.nodes[0].id));
         for (edge, node) in f.edges.iter().zip(f.nodes.iter().skip(1)) {

@@ -14,7 +14,9 @@ use policylens_rules::rule::RuleSet;
 use std::path::{Path, PathBuf};
 
 fn corpus_dir(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../test-corpus").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../test-corpus")
+        .join(name)
 }
 
 fn rules_dir() -> PathBuf {
@@ -106,7 +108,10 @@ fn safe_03_open_sg_instance_with_no_sensitive_access_triggers_nothing() {
 #[test]
 fn zero_01_single_private_bucket_triggers_nothing() {
     let rule_ids = scan("zero-01-single-private-bucket");
-    assert!(rule_ids.is_empty(), "expected no findings, got: {rule_ids:?}");
+    assert!(
+        rule_ids.is_empty(),
+        "expected no findings, got: {rule_ids:?}"
+    );
 }
 
 #[test]

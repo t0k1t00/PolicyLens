@@ -37,10 +37,10 @@ pub fn parse_directory(dir: &Path) -> Result<Vec<ParsedFile>> {
     }
 
     for path in entries {
-        let src = fs::read_to_string(&path)
-            .with_context(|| format!("reading {}", path.display()))?;
-        let body: hcl::Body = hcl::from_str(&src)
-            .with_context(|| format!("parsing HCL in {}", path.display()))?;
+        let src =
+            fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+        let body: hcl::Body =
+            hcl::from_str(&src).with_context(|| format!("parsing HCL in {}", path.display()))?;
         files.push(ParsedFile { path, body });
     }
 

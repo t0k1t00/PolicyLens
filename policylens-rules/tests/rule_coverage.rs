@@ -19,7 +19,9 @@ use policylens_rules::rule::RuleSet;
 use std::path::{Path, PathBuf};
 
 fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name)
 }
 
 fn rules_dir() -> PathBuf {
@@ -98,7 +100,8 @@ fn evidence_path_reconstructs_correct_file_and_attribute() {
     );
     assert_eq!(edge.evidence_attr_path, "policy.Statement[0]");
     assert!(
-        edge.description.contains("aws_iam_role_policy.broad_access_policy"),
+        edge.description
+            .contains("aws_iam_role_policy.broad_access_policy"),
         "evidence description should name the resource that actually declared the grant, got: {}",
         edge.description
     );
@@ -121,7 +124,10 @@ fn severity_score_and_explanation_are_internally_consistent() {
     // rule2's severity_base is "medium" (50); target bucket is sensitive
     // (+10); no publicly-reachable node in this fixture (+0); single hop
     // (no hop penalty) -> 60.
-    assert_eq!(f.severity.score, 60, "score should match the documented formula exactly");
+    assert_eq!(
+        f.severity.score, 60,
+        "score should match the documented formula exactly"
+    );
     assert_eq!(f.severity.label, "MEDIUM");
     assert!(f.severity.explanation.contains("base 50"));
     assert!(f.severity.explanation.contains("sensitivity bonus 10"));

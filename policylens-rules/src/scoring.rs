@@ -41,9 +41,9 @@
 //! intent that `severity_base` is the primary signal and these are
 //! secondary refinements.
 
+use crate::rule::Severity;
 use petgraph::graph::NodeIndex;
 use policylens_graph::graph::IacGraph;
-use crate::rule::Severity;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SeverityLabel {
@@ -110,7 +110,9 @@ pub fn score_finding(
     let extra_hops = edge_count.saturating_sub(1);
     let hop_penalty = (extra_hops as i64 * 5).min(20);
 
-    let sensitive = node_ixs.iter().any(|&ix| derived_bool(graph, ix, "sensitive"));
+    let sensitive = node_ixs
+        .iter()
+        .any(|&ix| derived_bool(graph, ix, "sensitive"));
     let sensitivity_bonus = if sensitive { 10 } else { 0 };
 
     let exposed = node_ixs.iter().any(|&ix| {

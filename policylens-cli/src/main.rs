@@ -31,11 +31,7 @@ fn debug_graph(dir: PathBuf, classified: bool) -> Result<()> {
         policylens_rules::classify::classify(&mut g);
     }
 
-    let nodes: Vec<_> = g
-        .graph
-        .node_indices()
-        .map(|ix| &g.graph[ix])
-        .collect();
+    let nodes: Vec<_> = g.graph.node_indices().map(|ix| &g.graph[ix]).collect();
     let edges: Vec<serde_json::Value> = g
         .graph
         .edge_indices()
@@ -83,7 +79,7 @@ fn run_scan(dir: PathBuf) -> Result<()> {
     println!("{}", policylens_rules::report::render_human(&report));
 
     let json = serde_json::to_string_pretty(&report)?;
-    std::fs::write("policylens-report.json", &json)?;
+    std::fs::write("policylens-report.json", json)?;
     println!("(also wrote policylens-report.json)");
 
     Ok(())

@@ -208,7 +208,10 @@ fn body_to_json(body: &hcl::Body) -> (serde_json::Value, bool) {
                 );
             }
             None => {
-                map.insert(block.identifier().to_string(), serde_json::Value::Array(vec![v]));
+                map.insert(
+                    block.identifier().to_string(),
+                    serde_json::Value::Array(vec![v]),
+                );
             }
         }
     }

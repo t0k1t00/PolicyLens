@@ -21,11 +21,11 @@
 //! invents information; it's a pure function of `(nodes, References edges)
 //! -> (derived facts, semantic edges)`.
 
-use policylens_graph::graph::IacGraph;
-use policylens_graph::types::{Edge, EdgeKind, ResourceKind, SourceRef};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
+use policylens_graph::graph::IacGraph;
+use policylens_graph::types::{Edge, EdgeKind, ResourceKind, SourceRef};
 use serde_json::{json, Value};
 
 /// Action-name substrings that count as "this grant lets you write/modify
@@ -185,7 +185,11 @@ fn derive_iam_role_trust_facts(graph: &mut IacGraph) {
         let wildcard = attrs
             .get("assume_role_policy")
             .and_then(|p| p.get("Statement"))
-            .map(|stmts| statement_iter(stmts).iter().any(statement_has_wildcard_principal))
+            .map(|stmts| {
+                statement_iter(stmts)
+                    .iter()
+                    .any(statement_has_wildcard_principal)
+            })
             .unwrap_or(false);
         set_derived(graph, role_ix, "wildcard_trust", json!(wildcard));
     }
@@ -209,7 +213,7 @@ fn statement_has_wildcard_principal(stmt: &&Value) -> bool {
     }
     match stmt.get("Principal") {
         Some(Value::String(s)) => s == "*",
-        Some(Value::Object(map)) => map.values().any(|v| value_contains_star(v)),
+        Some(Value::Object(map)) => map.values().any(value_contains_star),
         _ => false,
     }
 }
@@ -310,7 +314,12 @@ fn compute_iam_grant_edges(graph: &IacGraph) -> Vec<(NodeIndex, NodeIndex, Edge)
                 let Some(role_ix) = referenced_node(graph, ix, "role") else {
                     continue;
                 };
-                out.extend(grants_from_policy_holder(graph, ix, role_ix, node.id.clone()));
+                out.extend(grants_from_policy_holder(
+                    graph,
+                    ix,
+                    role_ix,
+                    node.id.clone(),
+                ));
             }
             ResourceKind::IamPolicy => {
                 // Find every attachment resource that links this policy to a role.
@@ -347,7 +356,10 @@ fn referenced_node(graph: &IacGraph, from_ix: NodeIndex, attr_path: &str) -> Opt
     graph
         .graph
         .edges_directed(from_ix, Direction::Outgoing)
-        .find(|e| matches!(&e.weight().kind, EdgeKind::References) && e.weight().evidence.attr_path == attr_path)
+        .find(|e| {
+            matches!(&e.weight().kind, EdgeKind::References)
+                && e.weight().evidence.attr_path == attr_path
+        })
         .map(|e| e.target())
 }
 
